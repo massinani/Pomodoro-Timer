@@ -1,0 +1,1767 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-palette="classico" data-mode="focus">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#461514">
+<title>Pomodoro</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+/* ============ TOKENS ============ */
+:root {
+  box-sizing: border-box;
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  color-scheme: dark;
+
+  --bg: #461514;
+  --panel: #2F0D0C;
+  --ink: #FFF6F4;
+  --muted: #E3C9C4;
+  --glass: rgba(255, 255, 255, .045);
+  --glass-2: rgba(255, 255, 255, .085);
+  --line: rgba(255, 255, 255, .11);
+  --font: "Plus Jakarta Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --rail: 76px;
+
+  /* Paleta clássica (padrão) */
+  --c-focus: #F0776B;
+  --c-short: #7DB3E8;
+  --c-long: #74CFA0;
+
+  --accent: var(--c-focus);
+  --accent-2: color-mix(in srgb, var(--accent) 50%, #ffffff);
+  --accent-ink: #15121B;
+}
+:root[data-palette="doce"]   { --c-focus: #F7B3C7; --c-short: #C6A7F2; --c-long: #F4D675; }
+:root[data-palette="aurora"] { --c-focus: #A27BFF; --c-short: #FF85C8; --c-long: #62BEFF; }
+:root[data-mode="short"] { --accent: var(--c-short); }
+:root[data-mode="long"]  { --accent: var(--c-long); }
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) { --bg: #461514; --ink: #FFF6F4; }
+}
+:root[data-theme="dark"] { --bg: #461514; --ink: #FFF6F4; }
+
+html {
+  scroll-behavior: smooth;
+  scroll-padding-top: calc(env(safe-area-inset-top, 0px) + 76px);
+}
+*, *::before, *::after { box-sizing: inherit; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+}
+a { color: inherit; }
+button { font: inherit; color: inherit; }
+img, svg { max-width: 100%; }
+[hidden] { display: none !important; }
+
+:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+
+/* ============ MENU LATERAL ============ */
+.rail {
+  position: fixed;
+  z-index: 40;
+  top: 0; left: 0; bottom: 0;
+  width: var(--rail);
+  padding: calc(env(safe-area-inset-top, 0px) + 16px) 10px calc(env(safe-area-inset-bottom, 0px) + 16px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  background: rgba(47, 13, 12, .92);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border-right: 1px solid var(--line);
+}
+.rail-logo { display: grid; width: 34px; height: 34px; margin-bottom: 14px; }
+.logo-arc { stroke: var(--accent); transition: stroke .4s; }
+.rail-btn {
+  position: relative;
+  width: 56px;
+  padding: 10px 0 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  border: 0;
+  border-radius: 14px;
+  background: transparent;
+  color: var(--muted);
+  font-size: .68rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color .2s, color .2s;
+}
+.rail-btn svg { width: 22px; height: 22px; transition: color .2s; }
+.rail-btn:hover { color: var(--ink); background: var(--glass); }
+.rail-btn[aria-expanded="true"] { color: var(--ink); background: var(--glass-2); }
+.rail-btn[aria-expanded="true"] svg { color: var(--accent); }
+.rail-float { margin-top: auto; }
+.badge {
+  position: absolute;
+  top: 4px; right: 5px;
+  min-width: 18px; height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-size: .65rem;
+  font-weight: 800;
+  display: grid;
+  place-items: center;
+  line-height: 1;
+}
+
+.panel {
+  position: fixed;
+  z-index: 35;
+  top: 0; bottom: 0;
+  left: var(--rail);
+  width: min(360px, calc(100vw - var(--rail)));
+  padding: calc(env(safe-area-inset-top, 0px) + 24px) 22px calc(env(safe-area-inset-bottom, 0px) + 24px);
+  background: var(--panel);
+  border-right: 1px solid var(--line);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  transform: translateX(-105%);
+  visibility: hidden;
+  transition: transform .3s ease, visibility 0s linear .3s;
+}
+.panel.open { transform: none; visibility: visible; transition: transform .3s ease, visibility 0s; }
+.panel-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.panel h2 { margin: 0; font-size: 1.3rem; font-weight: 800; letter-spacing: -.01em; }
+.panel h3 { margin: 26px 0 10px; font-size: .95rem; font-weight: 700; }
+.panel .sub { margin: -4px 0 12px; color: var(--muted); font-size: .85rem; line-height: 1.5; }
+.icon-btn {
+  width: 36px; height: 36px;
+  display: grid; place-items: center;
+  border: 0; border-radius: 10px;
+  background: var(--glass);
+  color: var(--muted);
+  cursor: pointer;
+}
+.icon-btn:hover { color: var(--ink); background: var(--glass-2); }
+.icon-btn svg { width: 18px; height: 18px; }
+
+.scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  background: rgba(25, 6, 5, .45);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .3s;
+}
+.scrim.show { opacity: 1; pointer-events: auto; }
+
+/* Paletas */
+.palette-list { display: grid; gap: 10px; }
+.palette-opt {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px;
+  border-radius: 14px;
+  background: var(--glass);
+  border: 1px solid var(--line);
+  cursor: pointer;
+  transition: border-color .2s, background-color .2s;
+}
+.palette-opt:hover { background: var(--glass-2); }
+.palette-opt:has(input:checked) { border-color: var(--accent); background: var(--glass-2); }
+.palette-opt:has(input:focus-visible) { outline: 3px solid var(--accent); outline-offset: 2px; }
+.palette-opt input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.swatches { display: flex; flex: none; }
+.swatches i { width: 24px; height: 24px; border-radius: 50%; border: 2px solid var(--panel); margin-left: -7px; }
+.swatches i:first-child { margin-left: 0; }
+.palette-name { display: block; font-weight: 700; font-size: .95rem; line-height: 1.3; }
+.palette-desc { display: block; color: var(--muted); font-size: .8rem; line-height: 1.4; }
+
+.toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--line);
+}
+.toggle-row label { cursor: pointer; }
+.t-title { display: block; font-weight: 600; font-size: .92rem; }
+.t-desc { display: block; color: var(--muted); font-size: .8rem; line-height: 1.4; }
+.switch {
+  appearance: none; -webkit-appearance: none;
+  flex: none;
+  position: relative;
+  width: 44px; height: 26px;
+  margin: 0;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, .14);
+  cursor: pointer;
+  transition: background-color .2s;
+}
+.switch::after {
+  content: "";
+  position: absolute;
+  top: 3px; left: 3px;
+  width: 20px; height: 20px;
+  border-radius: 50%;
+  background: #fff;
+  transition: transform .2s;
+}
+.switch:checked { background: var(--accent); }
+.switch:checked::after { transform: translateX(18px); }
+
+/* Tarefas */
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip {
+  border: 1px solid var(--line);
+  background: var(--glass);
+  border-radius: 999px;
+  padding: 8px 14px;
+  font-size: .85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color .2s, border-color .2s;
+}
+.chip span { color: var(--accent); margin-right: 2px; }
+.chip:hover { background: var(--glass-2); border-color: color-mix(in srgb, var(--accent) 40%, transparent); }
+.task-form { display: flex; gap: 8px; }
+.task-form input {
+  flex: 1;
+  min-width: 0;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--glass);
+  color: var(--ink);
+  font: inherit;
+  font-size: .95rem;
+}
+.task-form input::placeholder { color: color-mix(in srgb, var(--muted) 70%, transparent); }
+.btn-sm {
+  flex: none;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 12px;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-weight: 700;
+  font-size: .9rem;
+  cursor: pointer;
+}
+.task-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.task-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 8px 10px 14px;
+  border-radius: 12px;
+  background: var(--glass);
+  border: 1px solid var(--line);
+}
+.task-item label { flex: 1; min-width: 0; display: flex; align-items: center; gap: 12px; cursor: pointer; }
+.task-item input {
+  appearance: none; -webkit-appearance: none;
+  flex: none;
+  width: 22px; height: 22px;
+  margin: 0;
+  display: grid; place-items: center;
+  border-radius: 7px;
+  border: 2px solid rgba(255, 255, 255, .28);
+  cursor: pointer;
+  transition: background-color .15s, border-color .15s;
+}
+.task-item input::after {
+  content: "";
+  width: 6px; height: 11px;
+  border: solid var(--accent-ink);
+  border-width: 0 2.5px 2.5px 0;
+  transform: translate(0, -1px) rotate(45deg);
+  opacity: 0;
+}
+.task-item input:checked { background: var(--accent); border-color: var(--accent); }
+.task-item input:checked::after { opacity: 1; }
+.task-text { font-size: .95rem; overflow-wrap: anywhere; transition: color .2s; }
+.task-item input:checked + .task-text {
+  text-decoration: line-through;
+  text-decoration-thickness: 2px;
+  text-decoration-color: var(--accent);
+  color: var(--muted);
+}
+.task-del {
+  flex: none;
+  width: 30px; height: 30px;
+  display: grid; place-items: center;
+  border: 0; border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+.task-del:hover { background: var(--glass-2); color: var(--ink); }
+.task-del svg { width: 16px; height: 16px; }
+.task-empty {
+  margin: 0;
+  padding: 18px;
+  border: 1px dashed var(--line);
+  border-radius: 12px;
+  color: var(--muted);
+  font-size: .88rem;
+  text-align: center;
+}
+.task-footer { display: flex; justify-content: space-between; align-items: center; min-height: 32px; margin-top: 10px; color: var(--muted); font-size: .85rem; }
+.link-btn { border: 0; background: none; color: var(--muted); text-decoration: underline; cursor: pointer; font-size: .85rem; padding: 4px; }
+.link-btn:hover { color: var(--ink); }
+
+/* ============ PÁGINA ============ */
+.page { margin-left: var(--rail); min-width: 0; }
+.topbar {
+  position: sticky;
+  top: env(safe-area-inset-top, 0px);
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px clamp(20px, 4vw, 40px);
+  background: rgba(70, 21, 20, .85);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border-bottom: 1px solid var(--line);
+}
+.brand { display: flex; align-items: center; gap: 10px; font-weight: 800; font-size: 1.05rem; letter-spacing: -.01em; text-decoration: none; }
+.mark {
+  width: 20px; height: 20px;
+  border-radius: 50%;
+  border: 3px solid var(--accent);
+  border-right-color: rgba(255, 255, 255, .15);
+  transform: rotate(45deg);
+  transition: border-color .4s;
+}
+.topnav { display: flex; gap: 2px; }
+.topnav a { padding: 8px 12px; border-radius: 10px; color: var(--muted); font-size: .9rem; font-weight: 600; text-decoration: none; }
+.topnav a:hover { color: var(--ink); background: var(--glass); }
+
+/* Hero / timer */
+.hero {
+  min-height: calc(100vh - 64px);
+  min-height: calc(100svh - 64px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 20px 40px;
+}
+.timer { width: 100%; max-width: 440px; display: flex; flex-direction: column; align-items: center; gap: 22px; }
+
+.modes {
+  display: flex;
+  gap: 4px;
+  width: 100%;
+  padding: 4px;
+  border-radius: 999px;
+  background: var(--glass);
+  border: 1px solid var(--line);
+}
+.modes button {
+  flex: 1;
+  padding: 11px 6px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  font-size: .86rem;
+  font-weight: 600;
+  line-height: 1.2;
+  cursor: pointer;
+  transition: background-color .2s, color .2s;
+}
+.modes button:hover { color: var(--ink); }
+.modes button[aria-pressed="true"] { background: var(--glass-2); color: var(--ink); }
+
+.dial { position: relative; width: min(74vw, 320px); aspect-ratio: 1; }
+.dial svg {
+  width: 100%; height: 100%;
+  display: block;
+  overflow: visible;
+  transform: rotate(-90deg);
+  filter: drop-shadow(0 0 16px color-mix(in srgb, var(--accent) 45%, transparent));
+}
+.dial .disc { fill: rgba(20, 5, 4, .3); }
+.dial .track { stroke: rgba(255, 255, 255, .07); }
+.dial .progress { stroke-linecap: round; transition: stroke-dashoffset .25s linear; }
+.s1 { stop-color: var(--accent); transition: stop-color .4s; }
+.s2 { stop-color: var(--accent-2); transition: stop-color .4s; }
+.readout {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+}
+.time {
+  display: flex;
+  align-items: baseline;
+  font-size: clamp(3.4rem, 17vw, 4.9rem);
+  font-weight: 800;
+  letter-spacing: -.045em;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.colon { color: var(--muted); opacity: .7; margin: 0 .03em; }
+.time.running .colon { animation: breathe 2s ease-in-out infinite; }
+@keyframes breathe { 50% { opacity: .25; } }
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, .07);
+  border: 1px solid var(--line);
+  color: #E4E0EC;
+  font-size: .85rem;
+  font-weight: 600;
+}
+.pill::before {
+  content: "";
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 10px var(--accent);
+}
+
+.cycles { display: flex; gap: 10px; }
+.cycles span { width: 9px; height: 9px; border-radius: 50%; background: rgba(255, 255, 255, .12); transition: background-color .3s, box-shadow .3s; }
+.cycles span.done { background: var(--accent); box-shadow: 0 0 10px var(--accent); }
+
+.controls { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; width: 100%; }
+.btn {
+  padding: 17px 8px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--glass);
+  color: var(--ink);
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: transform .1s, opacity .2s, background-color .2s;
+}
+.btn:hover:not(:disabled) { background: var(--glass-2); }
+.btn:active:not(:disabled) { transform: scale(.97); }
+.btn.primary {
+  background: var(--accent);
+  border-color: transparent;
+  color: var(--accent-ink);
+  box-shadow: 0 10px 30px -12px var(--accent);
+}
+.btn.primary:hover:not(:disabled) { background: var(--accent-2); }
+.btn:disabled { opacity: .35; cursor: default; }
+
+.float-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: -6px;
+  padding: 8px 12px;
+  border: 0;
+  border-radius: 10px;
+  background: none;
+  color: var(--muted);
+  font-size: .9rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.float-btn:hover { color: var(--ink); background: var(--glass); }
+.float-btn svg { width: 18px; height: 18px; }
+
+/* Ajustar tempos */
+.adjust { width: 100%; border-radius: 18px; background: var(--glass); border: 1px solid var(--line); }
+.adjust summary {
+  list-style: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 18px;
+  border-radius: 18px;
+  font-size: .95rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.adjust summary::-webkit-details-marker { display: none; }
+.chev { width: 18px; height: 18px; color: var(--muted); transition: transform .2s; }
+.adjust[open] .chev { transform: rotate(180deg); }
+.adjust-body { padding: 0 18px 16px; }
+.time-row { display: flex; align-items: center; gap: 12px; padding: 11px 0; }
+.time-row + .time-row { border-top: 1px solid var(--line); }
+.ico { display: grid; color: var(--muted); }
+.ico svg { width: 20px; height: 20px; }
+.lbl { flex: 1; font-size: .95rem; font-weight: 700; }
+.stepper {
+  display: flex;
+  align-items: center;
+  padding: 3px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, .06);
+  border: 1px solid var(--line);
+}
+.stepper button {
+  width: 32px; height: 32px;
+  display: grid; place-items: center;
+  border: 0; border-radius: 8px;
+  background: transparent;
+  font-size: 1.1rem;
+  font-weight: 700;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.stepper button:hover { background: var(--glass-2); }
+.stepper output { min-width: 64px; text-align: center; font-size: .9rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+.adjust-note { margin: 6px 0 0; color: var(--muted); font-size: .8rem; }
+
+.scroll-cue {
+  margin-top: 40px;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  color: var(--muted);
+  font-size: .88rem;
+  font-weight: 600;
+  text-decoration: none;
+}
+.scroll-cue:hover { color: var(--ink); }
+.scroll-cue svg { width: 20px; height: 20px; }
+
+/* Seções */
+.section { max-width: 1080px; margin: 0 auto; padding: clamp(64px, 10vw, 112px) clamp(20px, 4vw, 40px); }
+.section + .section { border-top: 1px solid var(--line); }
+.section h2 { margin: 0 0 18px; max-width: 20ch; font-size: clamp(1.9rem, 4.4vw, 2.8rem); font-weight: 800; line-height: 1.12; letter-spacing: -.03em; }
+.lead { margin: 0 0 16px; max-width: 62ch; color: var(--muted); font-size: 1.06rem; line-height: 1.7; }
+
+.method-grid { display: grid; grid-template-columns: 1.25fr 1fr; gap: clamp(32px, 6vw, 72px); align-items: start; }
+.benefit { padding: 22px 0; border-top: 1px solid var(--line); }
+.benefit:last-child { border-bottom: 1px solid var(--line); }
+.benefit h3 { display: flex; align-items: center; gap: 10px; margin: 0 0 6px; font-size: 1.05rem; font-weight: 700; }
+.benefit h3::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--c-focus); }
+.benefit:nth-child(2) h3::before { background: var(--c-short); }
+.benefit:nth-child(3) h3::before { background: var(--c-long); }
+.benefit p { margin: 0; color: var(--muted); font-size: .95rem; }
+
+.steps { list-style: none; counter-reset: step; display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin: 36px 0 18px; padding: 0; }
+.steps li { counter-increment: step; padding: 22px 20px; border-radius: 18px; background: var(--glass); border: 1px solid var(--line); }
+.steps li::before {
+  content: counter(step);
+  display: grid; place-items: center;
+  width: 34px; height: 34px;
+  margin-bottom: 14px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  color: var(--accent);
+  font-weight: 800;
+}
+.steps h3 { margin: 0 0 6px; font-size: 1rem; font-weight: 700; }
+.steps p { margin: 0; color: var(--muted); font-size: .92rem; }
+.steps b { color: var(--ink); }
+
+.charts { display: grid; grid-template-columns: 1.6fr 1fr; gap: 14px; }
+.chart { margin: 0; padding: 24px; min-width: 0; border-radius: 20px; background: var(--glass); border: 1px solid var(--line); }
+.chart h3 { margin: 0 0 4px; font-size: 1.05rem; font-weight: 700; }
+.chart .sub { margin: 0 0 20px; color: var(--muted); font-size: .9rem; }
+.tl-bar { display: flex; gap: 3px; height: 52px; }
+.seg {
+  flex-basis: 0;
+  min-width: 4px;
+  display: grid; place-items: center;
+  border-radius: 8px;
+  color: var(--accent-ink);
+  font-size: .78rem;
+  font-weight: 800;
+  transition: flex-grow .4s;
+}
+.seg.focus, .dot.focus { background: var(--c-focus); }
+.seg.short, .dot.short { background: var(--c-short); }
+.seg.long, .dot.long { background: var(--c-long); }
+.tl-axis { display: flex; justify-content: space-between; margin-top: 8px; color: var(--muted); font-size: .8rem; font-variant-numeric: tabular-nums; }
+.dot { display: inline-block; flex: none; width: 9px; height: 9px; border-radius: 50%; margin-right: 10px; }
+.schedule { margin-top: 18px; overflow-x: auto; }
+.schedule table { width: 100%; min-width: 320px; border-collapse: collapse; font-size: .9rem; }
+.schedule th { padding: 0 6px 8px; color: var(--muted); font-size: .78rem; font-weight: 600; text-align: left; }
+.schedule td { padding: 9px 6px; border-top: 1px solid var(--line); white-space: nowrap; }
+.schedule .num { text-align: right; color: var(--muted); font-variant-numeric: tabular-nums; }
+.schedule th.num { text-align: right; }
+
+.donut-chart { display: flex; flex-direction: column; }
+.donut { position: relative; width: min(210px, 100%); aspect-ratio: 1; margin: 4px auto 20px; }
+.donut svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+.arc { fill: none; stroke-width: 14; }
+.arc.focus { stroke: var(--c-focus); }
+.arc.short { stroke: var(--c-short); }
+.arc.long  { stroke: var(--c-long); }
+.donut-center { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+.donut-center strong { font-size: 2.2rem; font-weight: 800; letter-spacing: -.03em; line-height: 1; }
+.donut-center span { color: var(--muted); font-size: .85rem; }
+.legend { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; font-size: .9rem; }
+.legend li { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.legend li span { display: flex; align-items: center; }
+.legend b { font-variant-numeric: tabular-nums; }
+.chart-note { margin: 14px 0 0; color: var(--muted); font-size: .85rem; }
+
+/* Seções "O método" e "Como funciona" */
+.academia > .section { position: relative; }
+.academia .steps li,
+.academia .chart {
+  background: rgba(110, 40, 36, .3);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+.academia .lead, .academia .benefit p, .academia .steps p, .academia .chart .sub, .academia .chart-note { color: var(--muted); }
+
+/* Rodapé */
+.footer { margin-top: 24px; padding: 56px clamp(20px, 4vw, 40px) 28px; border-top: 1px solid var(--line); background: rgba(20, 5, 4, .3); }
+.footer-inner { max-width: 1080px; margin: 0 auto; display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 32px; }
+.footer p { margin: 12px 0 0; max-width: 36ch; color: var(--muted); font-size: .92rem; }
+.footer h4 { margin: 0 0 12px; font-size: .9rem; font-weight: 700; }
+.footer ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.footer a, .flink { padding: 0; border: 0; background: none; color: var(--muted); font-size: .92rem; text-decoration: none; cursor: pointer; }
+.footer a:hover, .flink:hover { color: var(--ink); }
+.footer-bottom {
+  max-width: 1080px;
+  margin: 40px auto 0;
+  padding-top: 20px;
+  border-top: 1px solid var(--line);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px 48px;
+  color: var(--muted);
+  font-size: .85rem;
+  text-align: center;
+}
+
+/* Pop-up */
+.modal {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(25, 6, 5, .55);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .25s;
+}
+.modal.show { opacity: 1; pointer-events: auto; }
+.modal-box {
+  width: 100%;
+  max-width: 380px;
+  padding: 32px 26px 24px;
+  border-radius: 24px;
+  background: #5E1E1C;
+  border: 1px solid var(--line);
+  box-shadow: 0 30px 80px -20px rgba(0, 0, 0, .6);
+  text-align: center;
+  transform: translateY(14px) scale(.97);
+  transition: transform .25s ease;
+}
+.modal.show .modal-box { transform: none; }
+.modal-icon {
+  width: 68px; height: 68px;
+  margin: 0 auto 18px;
+  display: grid; place-items: center;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--m-accent) 18%, transparent);
+  color: var(--m-accent);
+  box-shadow: 0 0 44px -6px var(--m-accent);
+}
+.modal-icon svg { width: 30px; height: 30px; }
+.modal h3 { margin: 0 0 8px; font-size: 1.4rem; font-weight: 800; letter-spacing: -.02em; }
+.modal p { margin: 0 0 22px; color: var(--muted); font-size: .95rem; }
+.modal-actions { display: grid; gap: 8px; }
+
+.toast {
+  position: fixed;
+  z-index: 70;
+  left: 50%;
+  bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+  max-width: min(440px, calc(100vw - 32px));
+  padding: 14px 18px;
+  border-radius: 14px;
+  background: #5E1E1C;
+  border: 1px solid var(--line);
+  font-size: .9rem;
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, 20px);
+  transition: opacity .25s, transform .25s;
+}
+.toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+.pip-video { position: fixed; left: 0; bottom: 0; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+
+/* ============ RESPONSIVO ============ */
+@media (max-width: 900px) {
+  .steps { grid-template-columns: repeat(2, 1fr); }
+  .charts { grid-template-columns: 1fr; }
+  .method-grid { grid-template-columns: 1fr; }
+}
+@media (max-width: 760px) {
+  :root { --rail: 0px; }
+  .rail {
+    top: auto; right: 0;
+    width: auto;
+    flex-direction: row;
+    justify-content: center;
+    gap: 6px;
+    padding: 8px 12px calc(8px + env(safe-area-inset-bottom, 0px));
+    border-right: 0;
+    border-top: 1px solid var(--line);
+  }
+  .rail-logo { display: none; }
+  .rail-btn { flex: 1; max-width: 130px; width: auto; flex-direction: row; justify-content: center; gap: 8px; padding: 12px 8px; font-size: .85rem; }
+  .rail-float { margin-top: 0; }
+  .badge { top: 2px; right: 8px; }
+  .panel { left: 0; width: min(380px, 100vw); bottom: calc(66px + env(safe-area-inset-bottom, 0px)); padding-bottom: 24px; }
+  .page { padding-bottom: 72px; }
+  .toast { bottom: calc(86px + env(safe-area-inset-bottom, 0px)); }
+  .footer-inner { grid-template-columns: 1fr 1fr; }
+  .footer-brand { grid-column: 1 / -1; }
+}
+@media (max-width: 600px) {
+  .steps { grid-template-columns: 1fr; }
+  .seg { font-size: 0; }
+}
+@media (max-width: 440px) {
+  .topnav { display: none; }
+  .modes button { font-size: .8rem; }
+}
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after { transition-duration: .01ms !important; animation: none !important; }
+}
+</style>
+</head>
+<body>
+
+<!-- Menu lateral -->
+<nav class="rail" aria-label="Ferramentas">
+  <a class="rail-logo" href="#timer" aria-label="Ir para o timer">
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <circle cx="12" cy="12" r="8.5" fill="none" stroke="rgba(255,255,255,.14)" stroke-width="3"/>
+      <circle class="logo-arc" cx="12" cy="12" r="8.5" fill="none" stroke-width="3" stroke-linecap="round" stroke-dasharray="38 60" transform="rotate(-90 12 12)"/>
+    </svg>
+  </a>
+  <button class="rail-btn" data-open="settings" aria-controls="panel-settings" aria-expanded="false">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/></svg>
+    <span>Ajustes</span>
+  </button>
+  <button class="rail-btn" data-open="tasks" aria-controls="panel-tasks" aria-expanded="false">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 7h9M11 17h9"/><path d="M3.5 7l2 2 3.5-3.5"/><rect x="3.5" y="14.5" width="5" height="5" rx="1.2"/></svg>
+    <span>Tarefas</span>
+    <b class="badge" id="task-badge" hidden>0</b>
+  </button>
+  <button class="rail-btn rail-float" data-float>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2.5"/><rect x="12" y="11" width="7" height="6" rx="1.2" fill="currentColor" stroke="none"/></svg>
+    <span data-float-label data-off="Flutuar" data-on="Fechar">Flutuar</span>
+  </button>
+</nav>
+
+<!-- Painel de configurações -->
+<aside class="panel" id="panel-settings" aria-label="Configurações" inert>
+  <div class="panel-head">
+    <h2>Configurações</h2>
+    <button class="icon-btn" data-close aria-label="Fechar configurações"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+  </div>
+
+  <h3>Paleta de cores</h3>
+  <p class="sub">Cada paleta define uma cor para a concentração, o descanso curto e o descanso longo.</p>
+  <div class="palette-list" role="radiogroup" aria-label="Paleta de cores">
+    <label class="palette-opt">
+      <input type="radio" name="palette" value="classico">
+      <span class="swatches" aria-hidden="true"><i style="background:#F0776B"></i><i style="background:#7DB3E8"></i><i style="background:#74CFA0"></i></span>
+      <span><span class="palette-name">Clássica</span><span class="palette-desc">Tomate, céu e folha (padrão)</span></span>
+    </label>
+    <label class="palette-opt">
+      <input type="radio" name="palette" value="doce">
+      <span class="swatches" aria-hidden="true"><i style="background:#F7B3C7"></i><i style="background:#C6A7F2"></i><i style="background:#F4D675"></i></span>
+      <span><span class="palette-name">Doce</span><span class="palette-desc">Rosa bebê, lilás e amarelo</span></span>
+    </label>
+    <label class="palette-opt">
+      <input type="radio" name="palette" value="aurora">
+      <span class="swatches" aria-hidden="true"><i style="background:#A27BFF"></i><i style="background:#FF85C8"></i><i style="background:#62BEFF"></i></span>
+      <span><span class="palette-name">Aurora</span><span class="palette-desc">Roxo, rosa e azul</span></span>
+    </label>
+  </div>
+
+  <h3>Comportamento</h3>
+  <div class="toggle-row">
+    <label for="opt-sound"><span class="t-title">Som ao finalizar</span><span class="t-desc">Toca um aviso curto quando o tempo acaba.</span></label>
+    <input class="switch" type="checkbox" id="opt-sound">
+  </div>
+  <div class="toggle-row">
+    <label for="opt-auto"><span class="t-title">Iniciar a próxima etapa sozinho</span><span class="t-desc">Começa o descanso ou o foco seguinte sem esperar você.</span></label>
+    <input class="switch" type="checkbox" id="opt-auto">
+  </div>
+</aside>
+
+<!-- Painel de tarefas -->
+<aside class="panel" id="panel-tasks" aria-label="Tarefas" inert>
+  <div class="panel-head">
+    <h2>Tarefas</h2>
+    <button class="icon-btn" data-close aria-label="Fechar tarefas"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+  </div>
+
+  <h3>Sugestões</h3>
+  <div class="chips" id="chips"></div>
+
+  <h3>Nova tarefa</h3>
+  <form class="task-form" id="task-form">
+    <input id="task-input" type="text" maxlength="80" placeholder="Ex.: resumo do capítulo 3" aria-label="Nome da nova tarefa" autocomplete="off">
+    <button type="submit" class="btn-sm">Adicionar</button>
+  </form>
+
+  <h3>Suas tarefas</h3>
+  <ul class="task-list" id="task-list"></ul>
+  <p class="task-empty" id="task-empty">Nenhuma tarefa ainda. Toque em uma sugestão ou escreva a sua.</p>
+  <div class="task-footer">
+    <span id="task-count"></span>
+    <button type="button" class="link-btn" id="task-clear" hidden>Limpar concluídas</button>
+  </div>
+</aside>
+
+<div class="scrim" id="scrim"></div>
+
+<div class="page">
+  <header class="topbar">
+    <a class="brand" href="#timer"><span class="mark" aria-hidden="true"></span>pomodoro</a>
+    <nav class="topnav" aria-label="Seções">
+      <a href="#timer">Timer</a>
+      <a href="#metodo">O método</a>
+      <a href="#como-funciona">Como funciona</a>
+    </nav>
+  </header>
+
+  <main>
+    <!-- Timer -->
+    <section class="hero" id="timer" aria-label="Timer">
+      <div class="timer">
+        <div class="modes" role="group" aria-label="Etapa do timer">
+          <button data-mode="focus" aria-pressed="true">Foco</button>
+          <button data-mode="short" aria-pressed="false">Descanso curto</button>
+          <button data-mode="long" aria-pressed="false">Descanso longo</button>
+        </div>
+
+        <div class="dial">
+          <svg viewBox="0 0 120 120" aria-hidden="true">
+            <defs>
+              <linearGradient id="ring-grad" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0" class="s1"/>
+                <stop offset="1" class="s2"/>
+              </linearGradient>
+            </defs>
+            <circle class="disc" cx="60" cy="60" r="51"/>
+            <circle class="track" cx="60" cy="60" r="54" fill="none" stroke-width="4"/>
+            <circle class="progress" id="progress" cx="60" cy="60" r="54" fill="none" stroke="url(#ring-grad)" stroke-width="4"/>
+          </svg>
+          <div class="readout">
+            <div class="time" id="time" role="timer" aria-label="Tempo restante"><span id="mm">25</span><span class="colon">:</span><span id="ss">00</span></div>
+            <div class="pill" id="pill">Sessão de foco</div>
+          </div>
+        </div>
+
+        <div class="cycles" id="cycles" aria-label="Blocos de foco concluídos no ciclo">
+          <span></span><span></span><span></span><span></span>
+        </div>
+
+        <div class="controls">
+          <button class="btn primary" id="start">Iniciar</button>
+          <button class="btn" id="pause" disabled>Pausar</button>
+          <button class="btn" id="reset">Reiniciar</button>
+        </div>
+
+        <button class="float-btn" data-float>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2.5"/><rect x="12" y="11" width="7" height="6" rx="1.2" fill="currentColor" stroke="none"/></svg>
+          <span data-float-label data-off="Abrir janela flutuante" data-on="Fechar janela flutuante">Abrir janela flutuante</span>
+        </button>
+
+        <details class="adjust">
+          <summary>Ajustar tempos <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></summary>
+          <div class="adjust-body">
+            <div class="time-row">
+              <span class="ico" data-icon="focus"></span>
+              <span class="lbl" id="lbl-focus">Concentração</span>
+              <div class="stepper" data-key="focus" role="group" aria-labelledby="lbl-focus">
+                <button type="button" data-delta="-1" aria-label="Diminuir concentração">−</button>
+                <output aria-live="polite">25 min</output>
+                <button type="button" data-delta="1" aria-label="Aumentar concentração">+</button>
+              </div>
+            </div>
+            <div class="time-row">
+              <span class="ico" data-icon="short"></span>
+              <span class="lbl" id="lbl-short">Descanso curto</span>
+              <div class="stepper" data-key="short" role="group" aria-labelledby="lbl-short">
+                <button type="button" data-delta="-1" aria-label="Diminuir descanso curto">−</button>
+                <output aria-live="polite">5 min</output>
+                <button type="button" data-delta="1" aria-label="Aumentar descanso curto">+</button>
+              </div>
+            </div>
+            <div class="time-row">
+              <span class="ico" data-icon="long"></span>
+              <span class="lbl" id="lbl-long">Descanso longo</span>
+              <div class="stepper" data-key="long" role="group" aria-labelledby="lbl-long">
+                <button type="button" data-delta="-1" aria-label="Diminuir descanso longo">−</button>
+                <output aria-live="polite">15 min</output>
+                <button type="button" data-delta="1" aria-label="Aumentar descanso longo">+</button>
+              </div>
+            </div>
+            <p class="adjust-note">Se o timer já começou, o novo tempo vale ao reiniciar.</p>
+          </div>
+        </details>
+      </div>
+
+      <a class="scroll-cue" href="#metodo">Conheça o método
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+      </a>
+    </section>
+
+    <!-- O método -->
+    <div class="academia">
+    
+    <section class="section" id="metodo">
+      <div class="method-grid">
+        <div>
+          <h2>Foco em blocos curtos, com pausas de verdade</h2>
+          <p class="lead">O método Pomodoro foi criado pelo italiano Francesco Cirillo no fim dos anos 1980, quando ele ainda era universitário e procurava um jeito de estudar com mais foco. O nome vem do timer de cozinha em formato de tomate, pomodoro em italiano, que ele usava para marcar o tempo.</p>
+          <p class="lead">Em vez de tentar se concentrar por horas seguidas, você divide o trabalho em blocos cronometrados, separados por pausas. Saber que o descanso está perto deixa mais fácil começar e mais fácil manter a atenção até o fim de cada bloco.</p>
+        </div>
+        <div class="benefits">
+          <div class="benefit">
+            <h3>Menos procrastinação</h3>
+            <p>Começar 25 minutos de trabalho é bem menos intimidador do que começar "o trabalho todo".</p>
+          </div>
+          <div class="benefit">
+            <h3>Atenção protegida</h3>
+            <p>Durante o bloco, a regra é uma tarefa só. Ideias e interrupções são anotadas para depois.</p>
+          </div>
+          <div class="benefit">
+            <h3>Descanso planejado</h3>
+            <p>Pausas regulares reduzem o cansaço mental e ajudam a manter o ritmo ao longo do dia.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Como funciona -->
+    <section class="section" id="como-funciona">
+      <h2>Como funciona</h2>
+      <p class="lead">Um ciclo tem quatro blocos de foco intercalados com pausas e, com os tempos atuais, dura <span class="cycle-total">2h 10min</span>.</p>
+
+      <ol class="steps">
+        <li>
+          <h3>Escolha uma tarefa</h3>
+          <p>Defina o que vai fazer antes de começar. A lista de tarefas no menu lateral ajuda a manter uma coisa por vez.</p>
+        </li>
+        <li>
+          <h3>Foque sem interrupções</h3>
+          <p>Trabalhe por <b class="d-focus">25</b> minutos. Se surgir outra ideia, anote e volte para a tarefa.</p>
+        </li>
+        <li>
+          <h3>Faça uma pausa curta</h3>
+          <p>Descanse por <b class="d-short">5</b> minutos: levante, beba água, olhe para longe da tela.</p>
+        </li>
+        <li>
+          <h3>Pausa longa a cada quatro</h3>
+          <p>Depois de quatro blocos de foco, descanse <b class="d-long">15</b> minutos e comece um novo ciclo.</p>
+        </li>
+      </ol>
+
+      <div class="charts">
+        <figure class="chart">
+          <h3>Linha do tempo de um ciclo</h3>
+          <p class="sub">Cada barra é proporcional à duração da etapa.</p>
+          <div class="tl-bar" id="tl-bar" role="img" aria-label="Linha do tempo do ciclo Pomodoro"></div>
+          <div class="tl-axis"><span>0 min</span><span id="tl-end">2h 10min</span></div>
+          <div class="schedule">
+            <table>
+              <thead><tr><th>Etapa</th><th class="num">Horário</th><th class="num">Duração</th></tr></thead>
+              <tbody id="schedule-body"></tbody>
+            </table>
+          </div>
+        </figure>
+
+        <figure class="chart donut-chart">
+          <h3>Quanto do ciclo é foco</h3>
+          <p class="sub">Soma de cada tipo de etapa em um ciclo.</p>
+          <div class="donut">
+            <svg viewBox="0 0 120 120" aria-hidden="true">
+              <circle cx="60" cy="60" r="46" fill="none" stroke="rgba(255,255,255,.06)" stroke-width="14"/>
+              <circle class="arc focus" id="arc-focus" cx="60" cy="60" r="46"/>
+              <circle class="arc short" id="arc-short" cx="60" cy="60" r="46"/>
+              <circle class="arc long" id="arc-long" cx="60" cy="60" r="46"/>
+            </svg>
+            <div class="donut-center"><strong id="donut-pct">77%</strong><span>em foco</span></div>
+          </div>
+          <ul class="legend">
+            <li><span><i class="dot focus"></i>Concentração</span><b id="lg-focus"></b></li>
+            <li><span><i class="dot short"></i>Descansos curtos</span><b id="lg-short"></b></li>
+            <li><span><i class="dot long"></i>Descanso longo</span><b id="lg-long"></b></li>
+          </ul>
+        </figure>
+      </div>
+      <p class="chart-note">Os gráficos usam os tempos definidos em Ajustar tempos e mudam junto com eles.</p>
+    </section>
+    </div>
+  </main>
+
+  <!-- Rodapé -->
+  <footer class="footer">
+    <div class="footer-inner">
+      <div class="footer-brand">
+        <a class="brand" href="#timer"><span class="mark" aria-hidden="true"></span>pomodoro</a>
+        <p>Um timer para trabalhar em blocos de foco e descansar na hora certa.</p>
+      </div>
+      <div>
+        <h4>Navegação</h4>
+        <ul>
+          <li><a href="#timer">Timer</a></li>
+          <li><a href="#metodo">O método</a></li>
+          <li><a href="#como-funciona">Como funciona</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4>Ferramentas</h4>
+        <ul>
+          <li><button class="flink" data-open="tasks">Tarefas</button></li>
+          <li><button class="flink" data-open="settings">Configurações</button></li>
+          <li><button class="flink" data-float>Janela flutuante</button></li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <span>© 2026 Pomodoro. Todos os direitos reservados.</span>
+      <span>Page by Maxinani</span>
+      <a href="#timer">Voltar ao topo</a>
+    </div>
+  </footer>
+</div>
+
+<!-- Pop-up de fim de tempo -->
+<div class="modal" id="modal" role="alertdialog" aria-modal="true" aria-labelledby="modal-title" aria-describedby="modal-text" aria-hidden="true" inert>
+  <div class="modal-box">
+    <div class="modal-icon" id="modal-icon"></div>
+    <h3 id="modal-title"></h3>
+    <p id="modal-text"></p>
+    <div class="modal-actions">
+      <button class="btn primary" id="modal-primary"></button>
+      <button class="btn" id="modal-secondary">Agora não</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+(() => {
+  /* ============ CONSTANTES ============ */
+  const root = document.documentElement;
+  const $ = (s) => document.querySelector(s);
+  const $$ = (s) => document.querySelectorAll(s);
+
+  const MODES = {
+    focus: { name: "Concentração",   pill: "Sessão de foco",  tab: "Foco",     done: "Concentração finalizada" },
+    short: { name: "Descanso curto", pill: "Descanso curto",  tab: "Descanso", done: "Descanso curto finalizado" },
+    long:  { name: "Descanso longo", pill: "Descanso longo",  tab: "Descanso", done: "Descanso longo finalizado" }
+  };
+  const DEFAULTS = { focus: 25, short: 5, long: 15 };
+  const LIMITS = { focus: [1, 120], short: [1, 60], long: [1, 60] };
+  const PALETTES = ["classico", "doce", "aurora"];
+  const PRESETS = ["Estudo", "Leitura", "Exercícios", "Trabalho", "Revisão", "Projeto pessoal"];
+
+  const svg = (inner) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${inner}</svg>`;
+  const ICONS = {
+    focus: svg('<circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r="1" fill="currentColor"/>'),
+    short: svg('<path d="M4 9h12v5a5 5 0 0 1-5 5H9a5 5 0 0 1-5-5z"/><path d="M16 11h1.5a2.5 2.5 0 0 1 0 5H16"/><path d="M8 3.5v2.5M12 3.5v2.5"/>'),
+    long:  svg('<path d="M20 14.2A8 8 0 1 1 9.8 4a6.4 6.4 0 0 0 10.2 10.2z"/>'),
+    close: svg('<path d="M6 6l12 12M18 6L6 18"/>')
+  };
+
+  /* ============ ARMAZENAMENTO ============ */
+  const store = {
+    get(key, fallback) {
+      try { const v = localStorage.getItem("pomo:" + key); return v === null ? fallback : JSON.parse(v); }
+      catch (e) { return fallback; }
+    },
+    set(key, value) {
+      try { localStorage.setItem("pomo:" + key, JSON.stringify(value)); } catch (e) {}
+    }
+  };
+
+  let durations = Object.assign({}, DEFAULTS, store.get("durations", {}));
+  for (const k in LIMITS) {
+    const v = Math.round(Number(durations[k]));
+    durations[k] = v >= LIMITS[k][0] && v <= LIMITS[k][1] ? v : DEFAULTS[k];
+  }
+  const settings = Object.assign({ palette: "classico", sound: true, autoStart: false }, store.get("settings", {}));
+  if (!PALETTES.includes(settings.palette)) settings.palette = "classico";
+  let tasks = store.get("tasks", []);
+  if (!Array.isArray(tasks)) tasks = [];
+  tasks = tasks.filter(t => t && typeof t.text === "string");
+
+  const saveSettings = () => store.set("settings", settings);
+  const saveTasks = () => store.set("tasks", tasks);
+
+  /* ============ ESTADO DO TIMER ============ */
+  let mode = "focus";
+  let total = durations.focus * 60000;
+  let remaining = total;
+  let endAt = null;
+  let tick = null;
+  let completedFocus = 0;
+
+  const el = {
+    mm: $("#mm"), ss: $("#ss"), time: $("#time"), pill: $("#pill"), progress: $("#progress"),
+    start: $("#start"), pause: $("#pause"), reset: $("#reset"),
+    dots: $$("#cycles span"), modeBtns: $$(".modes button")
+  };
+  const RING_C = 2 * Math.PI * 54;
+  el.progress.style.strokeDasharray = RING_C;
+
+  const pad = (n) => String(n).padStart(2, "0");
+  function parts(ms) {
+    const s = Math.max(0, Math.ceil(ms / 1000));
+    return [pad(Math.floor(s / 60)), pad(s % 60)];
+  }
+  function pillText() {
+    if (!endAt && remaining < total && remaining > 0) return "Pausado";
+    return MODES[mode].pill;
+  }
+
+  function render() {
+    const [m, s] = parts(remaining);
+    el.mm.textContent = m;
+    el.ss.textContent = s;
+    el.progress.style.strokeDashoffset = RING_C * (1 - remaining / total);
+
+    const running = !!endAt;
+    el.time.classList.toggle("running", running);
+    el.start.disabled = running;
+    el.pause.disabled = !running;
+    el.start.textContent = !running && remaining < total ? "Continuar" : "Iniciar";
+    el.pill.textContent = pillText();
+
+    const filled = mode === "long" && completedFocus > 0 && completedFocus % 4 === 0 ? 4 : completedFocus % 4;
+    el.dots.forEach((d, i) => d.classList.toggle("done", i < filled));
+
+    document.title = running ? `${m}:${s} – ${MODES[mode].tab}` : "Pomodoro";
+    updateMini(m, s);
+    if (videoPipActive()) drawCanvas(m, s);
+  }
+
+  function setMode(m) {
+    stop();
+    mode = m;
+    root.dataset.mode = m;
+    el.modeBtns.forEach(b => b.setAttribute("aria-pressed", String(b.dataset.mode === m)));
+    total = durations[m] * 60000;
+    remaining = total;
+    render();
+  }
+
+  function start() {
+    if (endAt) return;
+    if (remaining <= 0) remaining = total;
+    unlockAudio();
+    endAt = Date.now() + remaining;
+    tick = setInterval(update, 250);
+    render();
+  }
+
+  function stop() {
+    clearInterval(tick);
+    tick = null;
+    if (endAt) remaining = Math.max(0, endAt - Date.now());
+    endAt = null;
+  }
+
+  function pause() {
+    if (!endAt) return;
+    stop();
+    render();
+  }
+
+  function reset() {
+    stop();
+    total = durations[mode] * 60000;
+    remaining = total;
+    render();
+  }
+
+  function update() {
+    remaining = Math.max(0, endAt - Date.now());
+    if (remaining <= 0) return finish();
+    render();
+  }
+
+  function finish() {
+    stop();
+    const finished = mode;
+    let next;
+    if (finished === "focus") {
+      completedFocus++;
+      next = completedFocus % 4 === 0 ? "long" : "short";
+    } else {
+      if (finished === "long") completedFocus = 0;
+      next = "focus";
+    }
+    setMode(next);
+    notify(finished, next);
+    if (settings.autoStart) start();
+  }
+
+  /* ============ AVISOS ============ */
+  function notify(finished, next) {
+    if (settings.sound) beep();
+    try { if (navigator.vibrate) navigator.vibrate([220, 100, 220]); } catch (e) {}
+
+    let body;
+    if (finished === "focus") {
+      const n = completedFocus % 4 || 4;
+      body = `Você concluiu ${n} de 4 blocos de foco. Agora é hora do ${MODES[next].name.toLowerCase()} de ${durations[next]} min.`;
+    } else if (finished === "short") {
+      body = `Pausa feita. Hora de voltar a focar por ${durations.focus} min.`;
+    } else {
+      body = `Ciclo completo! Quando quiser, comece um novo bloco de ${durations.focus} min de foco.`;
+    }
+    showModal(finished, next, body);
+
+    if (mini) {
+      mini.msg.textContent = MODES[finished].done;
+      clearTimeout(mini.timeout);
+      mini.timeout = setTimeout(() => { if (mini) mini.msg.textContent = ""; }, 10000);
+    }
+    document.title = `✓ ${MODES[finished].done}`;
+  }
+
+  const modal = $("#modal");
+  const mPrimary = $("#modal-primary");
+  const mSecondary = $("#modal-secondary");
+  let lastFocus = null;
+
+  function showModal(finished, next, body) {
+    modal.style.setProperty("--m-accent", `var(--c-${finished})`);
+    $("#modal-icon").innerHTML = ICONS[finished];
+    $("#modal-title").textContent = MODES[finished].done;
+    $("#modal-text").textContent = body;
+    if (settings.autoStart) {
+      mPrimary.textContent = "Continuar";
+      mSecondary.hidden = true;
+    } else {
+      mPrimary.textContent = `Iniciar ${MODES[next].name.toLowerCase()}`;
+      mSecondary.hidden = false;
+    }
+    lastFocus = document.activeElement;
+    modal.inert = false;
+    modal.setAttribute("aria-hidden", "false");
+    modal.classList.add("show");
+    setTimeout(() => mPrimary.focus({ preventScroll: true }), 60);
+  }
+
+  function closeModal() {
+    modal.classList.remove("show");
+    modal.setAttribute("aria-hidden", "true");
+    modal.inert = true;
+    render();
+    if (lastFocus && lastFocus.focus) lastFocus.focus({ preventScroll: true });
+  }
+
+  mPrimary.addEventListener("click", () => {
+    const shouldStart = !settings.autoStart;
+    closeModal();
+    if (shouldStart) start();
+  });
+  mSecondary.addEventListener("click", closeModal);
+  modal.addEventListener("click", (e) => { if (e.target === modal) closeModal(); });
+
+  const toastEl = $("#toast");
+  let toastTimer = null;
+  function toast(msg) {
+    toastEl.textContent = msg;
+    toastEl.classList.add("show");
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => toastEl.classList.remove("show"), 6000);
+  }
+
+  /* ============ SOM ============ */
+  let audioCtx = null;
+  function unlockAudio() {
+    try {
+      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      if (audioCtx.state === "suspended") audioCtx.resume();
+    } catch (e) {}
+  }
+  function beep() {
+    if (!audioCtx) return;
+    [0, 0.35, 0.7].forEach(offset => {
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      const t = audioCtx.currentTime + offset;
+      osc.type = "sine";
+      osc.frequency.value = 880;
+      gain.gain.setValueAtTime(0.0001, t);
+      gain.gain.exponentialRampToValueAtTime(0.25, t + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.28);
+      osc.connect(gain).connect(audioCtx.destination);
+      osc.start(t);
+      osc.stop(t + 0.3);
+    });
+  }
+
+  /* ============ JANELA FLUTUANTE ============ */
+  const MINI_CSS = `
+    :root { color-scheme: dark; --accent: #F0776B; }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; margin: 0; }
+    body {
+      font-family: "Plus Jakarta Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      background: radial-gradient(80% 60% at 50% 0%, color-mix(in srgb, var(--accent) 24%, transparent), transparent 70%), #0E0D13;
+      color: #F4F2F8;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 12px; padding: 16px; text-align: center;
+    }
+    .m-pill { display: inline-flex; align-items: center; gap: 8px; padding: 5px 12px; border-radius: 999px;
+      background: rgba(255,255,255,.07); border: 1px solid rgba(255,255,255,.09); font-size: 13px; font-weight: 600; }
+    .m-pill::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 8px var(--accent); }
+    .m-time { font-size: clamp(40px, 22vw, 76px); font-weight: 800; letter-spacing: -.04em; line-height: 1; font-variant-numeric: tabular-nums; }
+    .m-bar { width: 100%; max-width: 220px; height: 6px; border-radius: 9px; background: rgba(255,255,255,.1); overflow: hidden; }
+    .m-bar i { display: block; height: 100%; border-radius: 9px; background: var(--accent); transition: width .25s linear; }
+    .m-row { display: flex; gap: 8px; }
+    button { font: inherit; font-size: 14px; font-weight: 700; padding: 10px 16px; border-radius: 12px; cursor: pointer;
+      border: 1px solid rgba(255,255,255,.1); background: rgba(255,255,255,.06); color: #F4F2F8; }
+    .m-primary { background: var(--accent); border-color: transparent; color: #15121B; }
+    .m-msg { min-height: 18px; font-size: 13px; font-weight: 700; color: var(--accent); }
+  `;
+
+  let pipWin = null;
+  let mini = null;
+
+  function accentNow() {
+    return getComputedStyle(root).getPropertyValue("--accent").trim() || "#F0776B";
+  }
+
+  function buildMini(win) {
+    const d = win.document;
+    const font = d.createElement("link");
+    font.rel = "stylesheet";
+    font.href = "https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@600;700;800&display=swap";
+    d.head.appendChild(font);
+    const style = d.createElement("style");
+    style.textContent = MINI_CSS;
+    d.head.appendChild(style);
+    d.title = "Pomodoro";
+    d.body.innerHTML = `
+      <div class="m-pill" id="m-pill"></div>
+      <div class="m-time" id="m-time"></div>
+      <div class="m-bar"><i id="m-bar"></i></div>
+      <div class="m-row"><button class="m-primary" id="m-toggle"></button><button id="m-reset">Reiniciar</button></div>
+      <div class="m-msg" id="m-msg"></div>`;
+    mini = {
+      root: d.documentElement,
+      pill: d.getElementById("m-pill"),
+      time: d.getElementById("m-time"),
+      bar: d.getElementById("m-bar"),
+      toggle: d.getElementById("m-toggle"),
+      msg: d.getElementById("m-msg"),
+      timeout: null
+    };
+    mini.toggle.addEventListener("click", () => (endAt ? pause() : start()));
+    d.getElementById("m-reset").addEventListener("click", reset);
+    win.addEventListener("pagehide", () => { pipWin = null; mini = null; updateFloatLabels(); });
+  }
+
+  function updateMini(m, s) {
+    if (!mini) return;
+    mini.root.style.setProperty("--accent", accentNow());
+    mini.time.textContent = `${m}:${s}`;
+    mini.pill.textContent = pillText();
+    mini.bar.style.width = (remaining / total) * 100 + "%";
+    mini.toggle.textContent = endAt ? "Pausar" : remaining < total ? "Continuar" : "Iniciar";
+  }
+
+  // Alternativa para navegadores sem janela de documento: vídeo gerado a partir de um canvas
+  const canvas = document.createElement("canvas");
+  canvas.width = 480;
+  canvas.height = 270;
+  const video = document.createElement("video");
+  video.muted = true;
+  video.playsInline = true;
+  video.className = "pip-video";
+  video.setAttribute("aria-hidden", "true");
+  document.body.appendChild(video);
+  video.addEventListener("leavepictureinpicture", updateFloatLabels);
+
+  function videoPipActive() {
+    return document.pictureInPictureElement === video;
+  }
+
+  function drawCanvas(m, s) {
+    const g = canvas.getContext("2d");
+    const acc = accentNow();
+    g.fillStyle = "#0E0D13";
+    g.fillRect(0, 0, canvas.width, canvas.height);
+    g.lineCap = "round";
+    g.lineWidth = 9;
+    g.strokeStyle = "rgba(255,255,255,.08)";
+    g.beginPath(); g.arc(240, 135, 108, 0, Math.PI * 2); g.stroke();
+    const frac = remaining / total;
+    if (frac > 0) {
+      g.strokeStyle = acc;
+      g.beginPath(); g.arc(240, 135, 108, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * frac); g.stroke();
+    }
+    g.textAlign = "center";
+    g.textBaseline = "middle";
+    g.fillStyle = "#F4F2F8";
+    g.font = "800 62px 'Plus Jakarta Sans', system-ui, sans-serif";
+    g.fillText(`${m}:${s}`, 240, 126);
+    g.fillStyle = acc;
+    g.font = "600 18px 'Plus Jakarta Sans', system-ui, sans-serif";
+    g.fillText(pillText(), 240, 176);
+  }
+
+  function updateFloatLabels() {
+    const on = !!pipWin || videoPipActive();
+    $$("[data-float-label]").forEach(e => { e.textContent = on ? e.dataset.on : e.dataset.off; });
+  }
+
+  async function toggleFloating() {
+    if (pipWin) { pipWin.close(); return; }
+    if (videoPipActive()) { try { await document.exitPictureInPicture(); } catch (e) {} return; }
+
+    if ("documentPictureInPicture" in window) {
+      try {
+        pipWin = await window.documentPictureInPicture.requestWindow({ width: 300, height: 300 });
+        buildMini(pipWin);
+        render();
+        updateFloatLabels();
+        return;
+      } catch (e) { pipWin = null; }
+    }
+
+    if (document.pictureInPictureEnabled && canvas.captureStream) {
+      try {
+        const [m, s] = parts(remaining);
+        drawCanvas(m, s);
+        if (!video.srcObject) video.srcObject = canvas.captureStream();
+        drawCanvas(m, s);
+        await video.play();
+        await video.requestPictureInPicture();
+        render();
+        updateFloatLabels();
+        return;
+      } catch (e) {}
+    }
+
+    toast("O navegador bloqueou a janela flutuante aqui. Abra a página em uma nova aba no Chrome ou Edge e tente de novo.");
+  }
+  $$("[data-float]").forEach(b => b.addEventListener("click", toggleFloating));
+
+  /* ============ PAINÉIS LATERAIS ============ */
+  const panels = { settings: $("#panel-settings"), tasks: $("#panel-tasks") };
+  const scrim = $("#scrim");
+  let openName = null;
+
+  function openPanel(name) {
+    if (openName === name) { closePanels(); return; }
+    openName = name;
+    for (const [key, panel] of Object.entries(panels)) {
+      const on = key === name;
+      panel.classList.toggle("open", on);
+      panel.inert = !on;
+    }
+    $$(".rail-btn[data-open]").forEach(b => b.setAttribute("aria-expanded", String(b.dataset.open === name)));
+    scrim.classList.add("show");
+    setTimeout(() => panels[name].querySelector(".icon-btn").focus({ preventScroll: true }), 80);
+  }
+
+  function closePanels() {
+    openName = null;
+    for (const panel of Object.values(panels)) { panel.classList.remove("open"); panel.inert = true; }
+    $$(".rail-btn[data-open]").forEach(b => b.setAttribute("aria-expanded", "false"));
+    scrim.classList.remove("show");
+  }
+
+  $$("[data-open]").forEach(b => b.addEventListener("click", () => openPanel(b.dataset.open)));
+  $$("[data-close]").forEach(b => b.addEventListener("click", closePanels));
+  scrim.addEventListener("click", closePanels);
+
+  /* ============ CONFIGURAÇÕES ============ */
+  root.dataset.palette = settings.palette;
+  $$('input[name="palette"]').forEach(radio => {
+    radio.checked = radio.value === settings.palette;
+    radio.addEventListener("change", () => {
+      if (!radio.checked) return;
+      settings.palette = radio.value;
+      root.dataset.palette = radio.value;
+      saveSettings();
+      render();
+    });
+  });
+
+  const optSound = $("#opt-sound");
+  const optAuto = $("#opt-auto");
+  optSound.checked = settings.sound;
+  optAuto.checked = settings.autoStart;
+  optSound.addEventListener("change", () => { settings.sound = optSound.checked; saveSettings(); });
+  optAuto.addEventListener("change", () => { settings.autoStart = optAuto.checked; saveSettings(); });
+
+  /* ============ TAREFAS ============ */
+  const taskList = $("#task-list");
+  const taskEmpty = $("#task-empty");
+  const taskCount = $("#task-count");
+  const taskClear = $("#task-clear");
+  const taskBadge = $("#task-badge");
+  const taskInput = $("#task-input");
+
+  function addTask(text) {
+    text = String(text).trim().slice(0, 80);
+    if (!text) return;
+    tasks.push({ id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), text, done: false });
+    saveTasks();
+    renderTasks();
+  }
+
+  function renderTasks() {
+    taskList.replaceChildren();
+    tasks.forEach(task => {
+      const li = document.createElement("li");
+      li.className = "task-item";
+
+      const label = document.createElement("label");
+      const checkbox = document.createElement("input");
+      checkbox.type = "checkbox";
+      checkbox.checked = !!task.done;
+      const span = document.createElement("span");
+      span.className = "task-text";
+      span.textContent = task.text;
+      label.append(checkbox, span);
+      checkbox.addEventListener("change", () => {
+        task.done = checkbox.checked;
+        saveTasks();
+        updateTaskMeta();
+      });
+
+      const del = document.createElement("button");
+      del.type = "button";
+      del.className = "task-del";
+      del.setAttribute("aria-label", `Remover ${task.text}`);
+      del.innerHTML = ICONS.close;
+      del.addEventListener("click", () => {
+        tasks = tasks.filter(t => t !== task);
+        saveTasks();
+        renderTasks();
+      });
+
+      li.append(label, del);
+      taskList.appendChild(li);
+    });
+    updateTaskMeta();
+  }
+
+  function updateTaskMeta() {
+    const done = tasks.filter(t => t.done).length;
+    const pending = tasks.length - done;
+    taskList.hidden = tasks.length === 0;
+    taskEmpty.hidden = tasks.length > 0;
+    taskCount.textContent = tasks.length ? `${done} de ${tasks.length} concluídas` : "";
+    taskClear.hidden = done === 0;
+    taskBadge.textContent = pending;
+    taskBadge.hidden = pending === 0;
+  }
+
+  const chips = $("#chips");
+  PRESETS.forEach(name => {
+    const chip = document.createElement("button");
+    chip.type = "button";
+    chip.className = "chip";
+    chip.innerHTML = '<span aria-hidden="true">+</span> ';
+    chip.append(name);
+    chip.setAttribute("aria-label", `Adicionar tarefa ${name}`);
+    chip.addEventListener("click", () => addTask(name));
+    chips.appendChild(chip);
+  });
+
+  $("#task-form").addEventListener("submit", (e) => {
+    e.preventDefault();
+    addTask(taskInput.value);
+    taskInput.value = "";
+    taskInput.focus();
+  });
+  taskClear.addEventListener("click", () => {
+    tasks = tasks.filter(t => !t.done);
+    saveTasks();
+    renderTasks();
+  });
+
+  /* ============ AJUSTAR TEMPOS ============ */
+  function setDuration(key, value) {
+    const [min, max] = LIMITS[key];
+    value = Math.min(max, Math.max(min, value));
+    if (value === durations[key]) return;
+    const untouched = key === mode && !endAt && remaining === total;
+    durations[key] = value;
+    store.set("durations", durations);
+    if (untouched) {
+      total = value * 60000;
+      remaining = total;
+      render();
+    }
+    renderCharts();
+  }
+
+  $$(".stepper").forEach(stepper => {
+    const key = stepper.dataset.key;
+    const out = stepper.querySelector("output");
+    out.textContent = `${durations[key]} min`;
+    stepper.querySelectorAll("button").forEach(btn => {
+      btn.addEventListener("click", () => {
+        setDuration(key, durations[key] + Number(btn.dataset.delta));
+        out.textContent = `${durations[key]} min`;
+      });
+    });
+  });
+
+  $$("[data-icon]").forEach(e => { e.innerHTML = ICONS[e.dataset.icon]; });
+
+  /* ============ GRÁFICOS ============ */
+  function fmtDur(min) {
+    const h = Math.floor(min / 60), m = min % 60;
+    if (!h) return `${m} min`;
+    return m ? `${h}h ${m}min` : `${h}h`;
+  }
+  const fmtClock = (min) => `${Math.floor(min / 60)}:${pad(min % 60)}`;
+
+  function renderCharts() {
+    const seq = [];
+    for (let i = 0; i < 4; i++) { seq.push("focus"); seq.push(i < 3 ? "short" : "long"); }
+    const totalMin = seq.reduce((sum, k) => sum + durations[k], 0);
+
+    const bar = $("#tl-bar");
+    const body = $("#schedule-body");
+    bar.replaceChildren();
+    body.replaceChildren();
+    let t = 0;
+    seq.forEach(k => {
+      const d = durations[k];
+      const seg = document.createElement("div");
+      seg.className = `seg ${k}`;
+      seg.style.flexGrow = d;
+      seg.title = `${MODES[k].name}: ${d} min`;
+      seg.textContent = d;
+      bar.appendChild(seg);
+
+      const tr = document.createElement("tr");
+      tr.innerHTML = `<td><span class="dot ${k}"></span>${MODES[k].name}</td><td class="num">${fmtClock(t)} – ${fmtClock(t + d)}</td><td class="num">${d} min</td>`;
+      body.appendChild(tr);
+      t += d;
+    });
+    $("#tl-end").textContent = fmtDur(totalMin);
+    $$(".cycle-total").forEach(e => { e.textContent = fmtDur(totalMin); });
+
+    const sums = { focus: durations.focus * 4, short: durations.short * 3, long: durations.long };
+    donutData = { sums, totalMin };
+    ["focus", "short", "long"].forEach(k => { $(`#lg-${k}`).textContent = fmtDur(sums[k]); });
+    updateDonut();
+
+    $$(".d-focus").forEach(e => { e.textContent = durations.focus; });
+    $$(".d-short").forEach(e => { e.textContent = durations.short; });
+    $$(".d-long").forEach(e => { e.textContent = durations.long; });
+  }
+
+  /* ============ ROSCA ANIMADA PELA ROLAGEM ============ */
+  let donutData = null;
+  const donutEl = $(".donut");
+  const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const DONUT_C = 2 * Math.PI * 46;
+
+  // 0 quando o centro da rosca está na borda de baixo da tela, 1 quando chega a 45% da altura
+  function donutProgress() {
+    if (reduceMotion) return 1;
+    const r = donutEl.getBoundingClientRect();
+    const vh = window.innerHeight;
+    const center = r.top + r.height / 2;
+    const p = (vh - center) / (vh * 0.55);
+    return Math.min(1, Math.max(0, p));
+  }
+
+  function drawDonut(p) {
+    if (!donutData) return;
+    const { sums, totalMin } = donutData;
+    const eased = 1 - Math.pow(1 - p, 3);
+    const sweep = DONUT_C * eased;
+    let start = 0;
+    ["focus", "short", "long"].forEach(k => {
+      const len = (DONUT_C * sums[k]) / totalMin;
+      const visible = Math.min(len - 2.5, Math.max(0, sweep - start));
+      const arc = $(`#arc-${k}`);
+      arc.style.strokeDasharray = `${Math.max(visible, 0)} ${DONUT_C}`;
+      arc.style.strokeDashoffset = -start;
+      arc.style.opacity = visible > 0 ? 1 : 0;
+      start += len;
+    });
+    $("#donut-pct").textContent = Math.round((sums.focus / totalMin) * 100 * eased) + "%";
+  }
+
+  function updateDonut() { drawDonut(donutProgress()); }
+
+  let donutTicking = false;
+  function onScroll() {
+    if (donutTicking) return;
+    donutTicking = true;
+    requestAnimationFrame(() => { donutTicking = false; updateDonut(); });
+  }
+  window.addEventListener("scroll", onScroll, { passive: true });
+  window.addEventListener("resize", onScroll);
+
+  /* ============ EVENTOS ============ */
+  el.modeBtns.forEach(b => b.addEventListener("click", () => setMode(b.dataset.mode)));
+  el.start.addEventListener("click", start);
+  el.pause.addEventListener("click", pause);
+  el.reset.addEventListener("click", reset);
+
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") {
+      if (modal.classList.contains("show")) closeModal();
+      else if (openName) closePanels();
+      return;
+    }
+    if (modal.classList.contains("show")) return;
+    const tag = e.target.tagName;
+    if (["INPUT", "TEXTAREA", "BUTTON", "SELECT", "SUMMARY", "A", "LABEL"].includes(tag)) return;
+    if (e.code === "Space") { e.preventDefault(); endAt ? pause() : start(); }
+    else if ((e.key === "r" || e.key === "R") && !e.ctrlKey && !e.metaKey) reset();
+  });
+
+  /* ============ INÍCIO ============ */
+  renderTasks();
+  renderCharts();
+  setMode("focus");
+  updateFloatLabels();
+})();
+</script>
+</body>
+</html>
